@@ -28,7 +28,7 @@ import (
 
 /*
 	用法：
-	sync-pod-data --kubeconfig={kubeconfig} --namespace={namespace} --resource={kind/source-name} \
+	sync-volume-data --kubeconfig={kubeconfig} --namespace={namespace} --resource={kind/source-name} \
 	--volume={volume-name} --tool={rsync/scp} --source-dir={dir-or-file-path} --sshuser={ssh-user} \
 	--sshpwd={ssh-password} --ssh-port={ssh-port}
 */
