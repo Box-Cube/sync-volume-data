@@ -1,13 +1,13 @@
 # 传输数据到指定volume卷工具
 
-可以传输指定的数据(目录)到指定deploy/statefulset/daemonset 引用的volume卷中
+可以传输本地机器指定的文件(目录)到指定deploy/statefulset/daemonset 引用的volume卷中
 
 
 
 用法：
 
 ```
-./sync-data-tool -h        
+./sync-volume-tool -h        
 Usage of ./sync-data-tool:
   -kubeconfig string #kubeconfig路径
         (optional) absolute path to the kubeconfig file (default "/Users/boxcube/.kube/config")
