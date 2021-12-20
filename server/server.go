@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	remote "sync-volume-data/remote_execute"
+	"sync-volume-data/utils"
 	"syscall"
 )
 
@@ -40,23 +41,37 @@ type Server struct {
 	resourceKind string
 	resourceName string
 	volume       string
-	sourceDir    string
+	instanceIndex  int
+	sourceDir    *[]string
 	errMsg       []error
 }
 
-func NewServer(kubeclient *kubernetes.Clientset, sshuser, sshpwd, sshPort, tool, namespace, sourceKind, sourceName, volume, sourceDir *string) *Server {
+func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int) *Server {
 	errMsg := new([]error)
+
+	kubeclient := utils.NewClientset()
+
+	//sourceData := strings.Split(*resource, "/")
+	//if len(sourceData) < 2 {
+	//	log.Errorf(errors.New("resource need to specific, try -h get useage").Error())
+	//	os.Exit(1)
+	//}
+
+	//resourceKind := sourceData[0]
+	//resourceName := sourceData[1]
+
 	return &Server{
 		kubeclient:   kubeclient,
-		tool:         *tool,
-		namespace:    *namespace,
-		resourceKind: *sourceKind,
-		resourceName: *sourceName,
-		volume:       *volume,
-		sourceDir:    *sourceDir,
-		sshuser:      *sshuser,
-		sshpwd:       *sshpwd,
-		sshPort:      *sshPort,
+		tool:         tool,
+		namespace:    namespace,
+		resourceKind: resourceKind,
+		resourceName: resourceName,
+		volume:       volume,
+		instanceIndex:  instanceIndex,
+		sourceDir:    sourceDir,
+		sshuser:      sshuser,
+		sshpwd:       sshpwd,
+		sshPort:      sshPort,
 		errMsg:       *errMsg,
 	}
 }
@@ -69,9 +84,10 @@ type sourceInfo interface {
 }
 
 const (
-	deployKind      = "deploy"
-	statefulsetKind = "sts"
-	daemonsetKind   = "ds"
+	deployKind      = "Deployment"
+	statefulsetKind = "StatefulSet"
+	daemonsetKind   = "DaemonSet"
+	replicaSetKind = "ReplicaSet"
 )
 
 func (s *Server) Run() {
@@ -92,7 +108,7 @@ func (s *Server) Run() {
 	} else if s.resourceKind == daemonsetKind {
 		//TODO
 	} else if s.resourceKind == statefulsetKind {
-		//TODO
+		sourceExec = NewStatefulesetServer(s.namespace, s.resourceName, s.volume, s.instanceIndex, s.kubeclient)
 	}
 
 	volume, pod, err = sourceExec.getVolumePod()
@@ -118,13 +134,13 @@ func (s *Server) Run() {
 	log.Infof("get volume path: %s", volumePath)
 
 	//for debug
-	//nodeIP = "180.184.65.175"
+	nodeIP = "180.184.65.175"
 	sshcli := remote.NewCli(s.sshuser, s.sshpwd, fmt.Sprintf("%s:%s", nodeIP, s.sshPort))
 
 	//get only a row as expected
 	actualVolumePath, err := sshcli.Run(fmt.Sprintf("ls -d %s | awk 'NR=1{printf $NF}'", volumePath))
 	if err != nil {
-		log.Errorf("get err from remote node %s : %s",nodeIP, err.Error())
+		log.Errorf("get err from remote node %s : %s", nodeIP, err.Error())
 		os.Exit(22)
 	}
 
@@ -132,21 +148,33 @@ func (s *Server) Run() {
 
 	var args []string
 	command := s.tool
+
+	//sourceFile := strings.Join(*s.sourceDir, " ")
+
+
 	if s.tool == "scp" {
 		args = []string{
 			"-rp",
 			"-P",
 			s.sshPort,
-			s.sourceDir,
-			fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath),
 		}
+
+		for _, file := range *s.sourceDir {
+			args = append(args, file)
+		}
+
+		args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
 	} else if s.tool == "rsync" {
 		args = []string{
 			"-av",
 			"-e", fmt.Sprintf("ssh -p %s", s.sshPort),
-			s.sourceDir,
-			fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath),
 		}
+
+		for _, file := range *s.sourceDir {
+			args = append(args, file)
+		}
+
+		args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
 	}
 	log.Infof("execute command: %s args: %s", command, args)
 
@@ -188,17 +216,18 @@ func (s *Server) Run() {
 }
 
 func (s *Server) validateParameter() {
-	s.ValidateTool()
+	//s.ValidateTool()
 	s.ValidateSshPwd()
 	s.ValidateNamespace()
 	s.ValidateSourceKind()
 	s.ValidateSourceName()
 	s.ValidateVolume()
+	s.ValidateInstanceIndex()
 	s.ValidateSourceDir()
 
 	if len(s.errMsg) > 0 {
 		for _, err := range s.errMsg {
-			log.Errorf("%s", err)
+			log.Errorf(err.Error())
 		}
 		os.Exit(1)
 	}

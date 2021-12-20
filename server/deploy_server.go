@@ -30,28 +30,27 @@ import (
 )
 
 type deployServer struct {
-	namespace  string
-	sourceName string
-	volumeName string
-	kubeclient *kubernetes.Clientset
-	deploy     *appsv1.Deployment
-	pod        *corev1.Pod
+	namespace    string
+	resourceName string
+	volumeName   string
+	kubeclient   *kubernetes.Clientset
+	deploy       *appsv1.Deployment
+	pod          *corev1.Pod
 }
 
 func NewDeployServer(namespace, resourName, volumeName string, kubeclient *kubernetes.Clientset) *deployServer {
 	return &deployServer{
-		namespace:  namespace,
-		sourceName: resourName,
-		volumeName: volumeName,
-		kubeclient: kubeclient,
+		namespace:    namespace,
+		resourceName: resourName,
+		volumeName:   volumeName,
+		kubeclient:   kubeclient,
 	}
 }
 
 func (d *deployServer) getVolumePod() (volume *corev1.Volume, pod *corev1.Pod, err error) {
-
-	deploy, err := d.kubeclient.AppsV1().Deployments(d.namespace).Get(context.TODO(), d.sourceName, metav1.GetOptions{})
+	deploy, err := d.kubeclient.AppsV1().Deployments(d.namespace).Get(context.TODO(), d.resourceName, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, nil
+		return nil, nil, err
 	}
 
 	d.deploy = deploy
@@ -67,6 +66,7 @@ func (d *deployServer) getVolumePod() (volume *corev1.Volume, pod *corev1.Pod, e
 		if v.Name == d.volumeName {
 			tmpVolume := v
 			volume = &tmpVolume
+			break
 		}
 	}
 
@@ -93,8 +93,8 @@ func (d *deployServer) getPodFromSource() (pod *corev1.Pod, err error) {
 		for _, own := range pod.OwnerReferences {
 			deployName := own.Name[0:strings.LastIndex(own.Name, "-")]
 			//log.Infof("get deploy name: %s from pod %s", deployName, pod.Name)
-			if deployName == d.sourceName && *own.Controller && pod.Status.Phase != corev1.PodSucceeded &&
-				pod.Status.Phase != corev1.PodFailed {
+			if deployName == d.resourceName && *own.Controller && pod.Status.Phase != corev1.PodSucceeded &&
+				pod.Status.Phase != corev1.PodFailed && own.Kind == replicaSetKind {
 				return &pod, nil
 				// 基于以上的判断足够了...
 				//rs, err := s.kubeclient.AppsV1().ReplicaSets(s.namespace).Get(context.TODO(), own.Name, metav1.GetOptions{})
@@ -111,5 +111,5 @@ func (d *deployServer) getPodFromSource() (pod *corev1.Pod, err error) {
 		}
 	}
 
-	return nil, errors.New("pods not found")
+	return nil, errors.New("pod not found")
 }

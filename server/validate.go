@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package server
 
@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/martian/log"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
@@ -76,9 +77,7 @@ func (s *Server) ValidateSourceKind() error {
 	case "sts", "statefulset":
 		s.resourceKind = statefulsetKind
 
-		err := errors.New("statefulset kind is not currently supported, so stay tuned")
-		s.errMsg = append(s.errMsg, err)
-		return err
+		return nil
 	case "ds", "daemonset":
 		s.resourceKind = daemonsetKind
 
@@ -115,7 +114,23 @@ func (s *Server) ValidateSourceName() error {
 		}
 
 		return nil
+	} else if s.resourceKind == statefulsetKind {
+		sts, err := s.kubeclient.AppsV1().StatefulSets(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		expect := StatefulsetComplete(sts, &sts.Status)
+		if !expect {
+			err = errors.New(fmt.Sprintf("statefulset %s satuts not Completed", sts.Name))
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		return nil
 	} else {
+		//TODO support statefulset and daemonset
 		err := errors.New(fmt.Sprintf("sourceKind %s not supported, pleas try \"-h\" to get useage", s.resourceKind))
 		s.errMsg = append(s.errMsg, err)
 		return err
@@ -142,6 +157,20 @@ func (s *Server) ValidateVolume() (exist bool, err error) {
 				exist = true
 			}
 		}
+	} else if s.resourceKind == statefulsetKind {
+		sts, err := s.kubeclient.AppsV1().StatefulSets(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			s.errMsg = append(s.errMsg, err)
+			return false, err
+		}
+
+		for _, v := range sts.Spec.VolumeClaimTemplates {
+			if v.Name == s.volume {
+				exist = true
+			}
+		}
+	} else if s.resourceKind == daemonsetKind {
+		//TODO
 	}
 
 	if exist {
@@ -153,23 +182,63 @@ func (s *Server) ValidateVolume() (exist bool, err error) {
 	}
 }
 
+func (s *Server) ValidateInstanceIndex() (err error) {
+
+	if s.resourceKind == statefulsetKind {
+		if s.instanceIndex < 0 {
+			err = errors.New(fmt.Sprintf("you need to specific volume-index when you use resource %s", s.resourceKind))
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		sts, err := s.kubeclient.AppsV1().StatefulSets(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		if s.instanceIndex+1 > int(*sts.Spec.Replicas) {
+			err = errors.New(fmt.Sprintf("The value of instance-index is greater than the Replicas of statefulset %s", s.resourceKind))
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		return nil
+	} else {
+		if s.instanceIndex >= 0 {
+			err = errors.New(fmt.Sprintf("you don't need to specific volume-index when you use resource %s", s.resourceKind))
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+		return nil
+	}
+
+}
+
 func (s *Server) ValidateSourceDir() (exist bool, err error) {
-	if s.sourceDir == "" {
+
+	if len(*s.sourceDir) < 1 {
 		err = errors.New("source file/directory cannot be empty")
 		s.errMsg = append(s.errMsg, err)
 		return false, err
 	}
 
-	_, err = os.Stat(s.sourceDir)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		s.errMsg = append(s.errMsg, err)
-		return false, err
+	for _, file := range *s.sourceDir {
+		_, err = os.Stat(file)
+		if err == nil {
+			exist = true
+		} else if os.IsNotExist(err) {
+			s.errMsg = append(s.errMsg, err)
+			exist = false
+		}
 	}
 
-	s.errMsg = append(s.errMsg, err)
-	return false, err
+	//s.errMsg = append(s.errMsg, err)
+	if exist {
+		return true, nil
+	} else {
+		return false, err
+	}
 }
 
 // DeploymentComplete considers a deployment to be complete once all of its desired replicas
@@ -178,5 +247,18 @@ func DeploymentComplete(deployment *appsv1.Deployment, newStatus *appsv1.Deploym
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.Replicas == *(deployment.Spec.Replicas) &&
 		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
+		newStatus.ReadyReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= deployment.Generation
+}
+
+func StatefulsetComplete(sts *appsv1.StatefulSet, newStatus *appsv1.StatefulSetStatus) bool {
+	log.SetLevel(log.Debug)
+	log.Infof("%v,%v,%v,%v", newStatus.AvailableReplicas, newStatus.CurrentReplicas, newStatus.ReadyReplicas, newStatus.ObservedGeneration)
+	//log.Infof("%v", newStatus)
+	return newStatus.ReadyReplicas == *(sts.Spec.Replicas) &&
+		newStatus.Replicas == *(sts.Spec.Replicas) &&
+		newStatus.CurrentReplicas == *(sts.Spec.Replicas) &&
+		newStatus.UpdatedReplicas == *(sts.Spec.Replicas) &&
+		newStatus.ObservedGeneration >= sts.Generation
+	//newStatus.AvailableReplicas == *(sts.Spec.Replicas)
 }
