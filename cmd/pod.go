@@ -16,27 +16,52 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
+	"sync-volume-data/server"
 )
 
 // podCmd represents the pod command
-var podCmd = &cobra.Command{
-	Use:   "pod",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
+func newPodCmd() *cobra.Command {
+	return  &cobra.Command{
+		Use:   "pod",
+		Short: "A brief description of your command",
+		Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pod called")
-	},
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return errors.New("you need specific a pod name")
+			}
+
+			return nil
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("pod called, parent use:", cmd.Parent().Use)
+
+			if cmd.Parent().Use == "rsync" {
+				fmt.Printf("execute rsync pod %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
+					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
+				s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "pod", args[0], *volume, source, -1)
+				s.Run()
+			} else if cmd.Parent().Use == "scp" {
+				fmt.Printf("execute scp pod %s, volume is %s\n", args[0], *volume)
+				s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "pod", args[0], *volume, source, -1)
+				s.Run()
+			}
+		},
+	}
 }
 
 func init() {
-	rsyncCmd.AddCommand(podCmd)
+	//scpCmd.AddCommand(podCmd)
+	//rsyncCmd.AddCommand(podCmd)
+	rsyncCmd.AddCommand(newPodCmd())
+	scpCmd.AddCommand(newPodCmd())
 
 	// Here you will define your flags and configuration settings.
 

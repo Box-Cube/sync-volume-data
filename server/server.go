@@ -88,6 +88,7 @@ const (
 	statefulsetKind = "StatefulSet"
 	daemonsetKind   = "DaemonSet"
 	replicaSetKind = "ReplicaSet"
+	podKind = "Pod"
 )
 
 func (s *Server) Run() {
@@ -106,9 +107,11 @@ func (s *Server) Run() {
 		sourceExec = NewDeployServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
 		//volume, pod, err = deployRun.getVolumeInfo()
 	} else if s.resourceKind == daemonsetKind {
-		//TODO
+		sourceExec = NewDaemonsetServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
 	} else if s.resourceKind == statefulsetKind {
 		sourceExec = NewStatefulesetServer(s.namespace, s.resourceName, s.volume, s.instanceIndex, s.kubeclient)
+	} else if s.resourceKind == podKind {
+		sourceExec = NewPodServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
 	}
 
 	volume, pod, err = sourceExec.getVolumePod()
@@ -134,7 +137,8 @@ func (s *Server) Run() {
 	log.Infof("get volume path: %s", volumePath)
 
 	//for debug
-	nodeIP = "180.184.65.175"
+	//nodeIP = "180.184.65.175"
+	nodeIP = "180.184.64.139"
 	sshcli := remote.NewCli(s.sshuser, s.sshpwd, fmt.Sprintf("%s:%s", nodeIP, s.sshPort))
 
 	//get only a row as expected

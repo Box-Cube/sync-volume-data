@@ -32,6 +32,7 @@ var (
 	sshuser *string
 	sshpwd *string
 	sshPort *string
+	tool string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -82,6 +83,8 @@ func init() {
 	rootCmd.MarkPersistentFlagRequired("namespace")
 	rootCmd.MarkPersistentFlagRequired("source")
 	rootCmd.MarkPersistentFlagRequired("ssh-password")
+
+
 
 }
 

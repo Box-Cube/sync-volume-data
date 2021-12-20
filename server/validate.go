@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/google/martian/log"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 )
@@ -76,14 +77,13 @@ func (s *Server) ValidateSourceKind() error {
 		return nil
 	case "sts", "statefulset":
 		s.resourceKind = statefulsetKind
-
 		return nil
 	case "ds", "daemonset":
 		s.resourceKind = daemonsetKind
-
-		err := errors.New("daemonset kind is not currently supported, so stay tuned")
-		s.errMsg = append(s.errMsg, err)
-		return err
+		return nil
+	case "pod":
+		s.resourceKind = podKind
+		return nil
 	default:
 		err := errors.New(fmt.Sprintf("sourceKind %s not supported, pleas try \"-h\" to get useage", s.resourceKind))
 		s.errMsg = append(s.errMsg, err)
@@ -129,6 +129,31 @@ func (s *Server) ValidateSourceName() error {
 		}
 
 		return nil
+	} else if s.resourceKind == daemonsetKind {
+		ds, err := s.kubeclient.AppsV1().DaemonSets(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		expect := DaemonsetComplete(ds, &ds.Status)
+		if !expect {
+			err = errors.New(fmt.Sprintf("daemonset %s satuts not Completed", ds.Name))
+			s.errMsg = append(s.errMsg, err)
+			return err
+		}
+
+		return nil
+	} else if s.resourceKind == podKind {
+		pod, err := s.kubeclient.CoreV1().Pods(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if pod.Status.Phase != corev1.PodRunning {
+			return errors.New(fmt.Sprintf("pod %s not running...", s.resourceName))
+		}
+
+		return nil
 	} else {
 		//TODO support statefulset and daemonset
 		err := errors.New(fmt.Sprintf("sourceKind %s not supported, pleas try \"-h\" to get useage", s.resourceKind))
@@ -170,7 +195,27 @@ func (s *Server) ValidateVolume() (exist bool, err error) {
 			}
 		}
 	} else if s.resourceKind == daemonsetKind {
-		//TODO
+		ds, err := s.kubeclient.AppsV1().DaemonSets(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, v := range ds.Spec.Template.Spec.Volumes {
+			if v.Name == s.volume {
+				exist = true
+			}
+		}
+	} else if s.resourceKind == podKind {
+		pod, err := s.kubeclient.CoreV1().Pods(s.namespace).Get(context.TODO(), s.resourceName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, v := range pod.Spec.Volumes {
+			if v.Name == s.volume {
+				exist = true
+			}
+		}
 	}
 
 	if exist {
@@ -261,4 +306,11 @@ func StatefulsetComplete(sts *appsv1.StatefulSet, newStatus *appsv1.StatefulSetS
 		newStatus.UpdatedReplicas == *(sts.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= sts.Generation
 	//newStatus.AvailableReplicas == *(sts.Spec.Replicas)
+}
+
+func DaemonsetComplete(ds *appsv1.DaemonSet, newStatus *appsv1.DaemonSetStatus) bool {
+	return newStatus.CurrentNumberScheduled == newStatus.DesiredNumberScheduled &&
+		newStatus.NumberAvailable == newStatus.DesiredNumberScheduled &&
+		newStatus.NumberMisscheduled == 0 && newStatus.NumberReady == newStatus.DesiredNumberScheduled &&
+		newStatus.ObservedGeneration >= ds.Generation
 }

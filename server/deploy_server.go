@@ -93,8 +93,7 @@ func (d *deployServer) getPodFromSource() (pod *corev1.Pod, err error) {
 		for _, own := range pod.OwnerReferences {
 			deployName := own.Name[0:strings.LastIndex(own.Name, "-")]
 			//log.Infof("get deploy name: %s from pod %s", deployName, pod.Name)
-			if deployName == d.resourceName && *own.Controller && pod.Status.Phase != corev1.PodSucceeded &&
-				pod.Status.Phase != corev1.PodFailed && own.Kind == replicaSetKind {
+			if deployName == d.resourceName && *own.Controller && pod.Status.Phase == corev1.PodRunning {
 				return &pod, nil
 				// 基于以上的判断足够了...
 				//rs, err := s.kubeclient.AppsV1().ReplicaSets(s.namespace).Get(context.TODO(), own.Name, metav1.GetOptions{})

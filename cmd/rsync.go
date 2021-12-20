@@ -42,6 +42,7 @@ var rsyncCmd = &cobra.Command{
 	//Run: func(cmd *cobra.Command, args []string) {
 	//	//fmt.Println("you need to specific a resource kind ")
 	//	log.Errorf("you need to specific a resource kind ")
+	//	*tool = "rsync"
 	//},
 }
 

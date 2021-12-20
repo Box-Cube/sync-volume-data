@@ -23,50 +23,58 @@ import (
 )
 
 // stsCmd represents the sts command
-var stsCmd = &cobra.Command{
-	Use:   "sts",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
+func newStsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "sts",
+		Short: "A brief description of your command",
+		Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("you need specific a statefulset name")
-		}
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return errors.New("you need specific a statefulset name")
+			}
 
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("sts called")
+			return nil
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("sts called")
 
-		if cmd.Parent().Use == "rsync" {
-			fmt.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, instanceIdex:%d\n",
-				args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, *instanceIndex)
-			s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *instanceIndex)
-			s.Run()
-		} else if cmd.Parent().Use == "scp" {
-			fmt.Printf("execute scp deploy %s, volume is %s\n", args[0], *volume)
-			s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *instanceIndex)
-			s.Run()
-		}
-	},
+			if cmd.Parent().Use == "rsync" {
+				fmt.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, instanceIdex:%d\n",
+					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, *rsyncInstanceIndex)
+				s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *rsyncInstanceIndex)
+				s.Run()
+			} else if cmd.Parent().Use == "scp" {
+				fmt.Printf("execute scp deploy %s, volume is %s\n", args[0], *volume)
+				s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *scpInstanceIndex)
+				s.Run()
+			}
+		},
+	}
 }
 
-var instanceIndex *int
+var (
+	rsyncInstanceIndex *int
+	scpInstanceIndex *int
+)
 
 func init() {
-	rsyncCmd.AddCommand(stsCmd)
-	scpCmd.AddCommand(stsCmd)
+	rsyncStsCmd := newStsCmd()
+	scpStsCmd := newStsCmd()
+	rsyncCmd.AddCommand(rsyncStsCmd)
+	scpCmd.AddCommand(scpStsCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// stsCmd.PersistentFlags().String("foo", "", "A help for foo")
-	instanceIndex = stsCmd.Flags().IntP("instance-index", "i", -1, "specific instance index when you use statefule kind resource")
+	rsyncInstanceIndex = rsyncStsCmd.Flags().IntP("instance-index", "i", -1, "specific instance index when you use statefulset kind resource")
+	scpInstanceIndex = scpStsCmd.Flags().IntP("instance-index", "i", -1, "specific instance index when you use statefulset kind resource")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

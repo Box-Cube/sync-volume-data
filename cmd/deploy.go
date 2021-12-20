@@ -25,42 +25,43 @@ import (
 )
 
 // deployCmd represents the deploy command
-var deployCmd = &cobra.Command{
-	Use:   "deploy",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
+func newDeployCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "deploy",
+		Short: "A brief description of your command",
+		Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("you need specific a deploy name")
-		}
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return errors.New("you need specific a deploy name")
+			}
 
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("deploy called")
+			return nil
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("deploy called")
 
-		if cmd.Parent().Use == "rsync" {
-			fmt.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
-				args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-			s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1)
-			s.Run()
-		} else if cmd.Parent().Use == "scp" {
-			fmt.Printf("execute scp deploy %s, volume is %s\n", args[0], *volume)
-			s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1)
-			s.Run()
-		}
-	},
+			if cmd.Parent().Use == "rsync" {
+				fmt.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
+					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
+				s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1)
+				s.Run()
+			} else if cmd.Parent().Use == "scp" {
+				fmt.Printf("execute scp deploy %s, volume is %s\n", args[0], *volume)
+				s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1)
+				s.Run()
+			}
+		},
+	}
 }
 
 func init() {
-	//rootCmd.AddCommand(deployCmd)
-	rsyncCmd.AddCommand(deployCmd)
-	scpCmd.AddCommand(deployCmd)
+	rsyncCmd.AddCommand(newDeployCmd())
+	scpCmd.AddCommand(newDeployCmd())
 
 	// Here you will define your flags and configuration settings.
 
