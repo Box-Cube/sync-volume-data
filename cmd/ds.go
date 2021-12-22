@@ -13,11 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"sync-volume-data/server"
 )
@@ -26,13 +28,12 @@ import (
 func newDsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ds",
-		Short: "A brief description of your command",
-		Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+		Short: "transfer data to DaemonSet kind resource",
+		Long: `transfer data to DaemonSet kind resource, you need to specific a daemonset name.
+ For example:
+	
+	sync-volume-data rsync ds nginx -n my-web -v web -u root -p "myPassword" -s=test.file
+`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return errors.New("you need specific a daemonset name")
@@ -41,16 +42,20 @@ to quickly create a Cobra application.`,
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("ds called")
-
-			if cmd.Parent().Use == "rsync" {
+			logger := newLogger().WithFields(logrus.Fields{
+				"namespace": *namespace,
+				"kind":   cmd.Use,
+				"name": args[0],
+			})
+			logger.Debug("ds called")
+			if cmd.Parent().Use == RsyncTool {
 				fmt.Printf("execute rsync daemonset %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-				s := server.NewServer("rsync", *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1)
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger)
 				s.Run()
-			} else if cmd.Parent().Use == "scp" {
+			} else if cmd.Parent().Use == ScpTool {
 				fmt.Printf("execute scp daemonset %s, volume is %s\n", args[0], *volume)
-				s := server.NewServer("scp", *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1)
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger)
 				s.Run()
 			}
 		},
@@ -60,14 +65,4 @@ to quickly create a Cobra application.`,
 func init() {
 	rsyncCmd.AddCommand(newDsCmd())
 	scpCmd.AddCommand(newDsCmd())
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// dsCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// dsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

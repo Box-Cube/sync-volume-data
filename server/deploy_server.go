@@ -19,7 +19,7 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/google/martian/log"
+	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,14 +36,16 @@ type deployServer struct {
 	kubeclient   *kubernetes.Clientset
 	deploy       *appsv1.Deployment
 	pod          *corev1.Pod
+	log          *logrus.Entry
 }
 
-func NewDeployServer(namespace, resourName, volumeName string, kubeclient *kubernetes.Clientset) *deployServer {
+func NewDeployServer(namespace, resourName, volumeName string, kubeclient *kubernetes.Clientset, logger *logrus.Entry) *deployServer {
 	return &deployServer{
 		namespace:    namespace,
 		resourceName: resourName,
 		volumeName:   volumeName,
 		kubeclient:   kubeclient,
+		log:          logger,
 	}
 }
 
@@ -57,10 +59,10 @@ func (d *deployServer) getVolumePod() (volume *corev1.Volume, pod *corev1.Pod, e
 	//get pod from specific deploy
 	pod, err = d.getPodFromSource()
 	if err != nil {
-		log.Errorf("%s", err.Error())
+		d.log.Errorf("%s", err.Error())
 		os.Exit(1)
 	}
-	//log.Infof("get pod %s from deployment %s\n", pod.Name, deploy.Name)
+	d.log.Infof("get pod %s from deployment %s\n", pod.Name, deploy.Name)
 
 	for _, v := range deploy.Spec.Template.Spec.Volumes {
 		if v.Name == d.volumeName {
@@ -93,7 +95,8 @@ func (d *deployServer) getPodFromSource() (pod *corev1.Pod, err error) {
 		for _, own := range pod.OwnerReferences {
 			deployName := own.Name[0:strings.LastIndex(own.Name, "-")]
 			//log.Infof("get deploy name: %s from pod %s", deployName, pod.Name)
-			if deployName == d.resourceName && *own.Controller && pod.Status.Phase == corev1.PodRunning {
+			if deployName == d.resourceName && *own.Controller &&
+				own.Kind == replicaSetKind && pod.Status.Phase == corev1.PodRunning {
 				return &pod, nil
 				// 基于以上的判断足够了...
 				//rs, err := s.kubeclient.AppsV1().ReplicaSets(s.namespace).Get(context.TODO(), own.Name, metav1.GetOptions{})

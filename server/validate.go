@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/martian/log"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -297,9 +296,6 @@ func DeploymentComplete(deployment *appsv1.Deployment, newStatus *appsv1.Deploym
 }
 
 func StatefulsetComplete(sts *appsv1.StatefulSet, newStatus *appsv1.StatefulSetStatus) bool {
-	log.SetLevel(log.Debug)
-	log.Infof("%v,%v,%v,%v", newStatus.AvailableReplicas, newStatus.CurrentReplicas, newStatus.ReadyReplicas, newStatus.ObservedGeneration)
-	//log.Infof("%v", newStatus)
 	return newStatus.ReadyReplicas == *(sts.Spec.Replicas) &&
 		newStatus.Replicas == *(sts.Spec.Replicas) &&
 		newStatus.CurrentReplicas == *(sts.Spec.Replicas) &&

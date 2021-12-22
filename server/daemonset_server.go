@@ -19,28 +19,31 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 type daemonsetServer struct {
-	namespace string
+	namespace    string
 	resourceName string
-	volumeName string
-	kubeclient *kubernetes.Clientset
-	daemonset *appsv1.DaemonSet
-	pod *corev1.Pod
+	volumeName   string
+	kubeclient   *kubernetes.Clientset
+	log          *logrus.Entry
+	daemonset    *appsv1.DaemonSet
+	pod          *corev1.Pod
 }
 
-func NewDaemonsetServer(namespace, resourceName, volumeName string, kubeclient *kubernetes.Clientset) *daemonsetServer {
+func NewDaemonsetServer(namespace, resourceName, volumeName string, kubeclient *kubernetes.Clientset, log *logrus.Entry) *daemonsetServer {
 	return &daemonsetServer{
-		namespace: namespace,
+		namespace:    namespace,
 		resourceName: resourceName,
-		volumeName: volumeName,
-		kubeclient: kubeclient,
+		volumeName:   volumeName,
+		kubeclient:   kubeclient,
+		log:          log,
 	}
 }
 
@@ -55,7 +58,7 @@ func (d *daemonsetServer) getVolumePod() (volume *corev1.Volume, pod *corev1.Pod
 	if err != nil {
 		return nil, nil, err
 	}
-
+	d.log.Infof("get pod %s from daemonset %s\n", pod.Name, ds.Name)
 	for _, v := range ds.Spec.Template.Spec.Volumes {
 		if v.Name == d.volumeName {
 			tmpVolume := v
@@ -80,7 +83,7 @@ func (d *daemonsetServer) getPodFromSource() (pod *corev1.Pod, err error) {
 	for _, pod := range pods.Items {
 		for _, own := range pod.OwnerReferences {
 			if own.Name == d.resourceName && *own.Controller && pod.Status.Phase == corev1.PodRunning &&
-				own.Kind == "DaemonSet" {
+				own.Kind == daemonsetKind {
 				return &pod, nil
 			}
 		}

@@ -24,19 +24,19 @@ import (
 )
 
 type podServer struct {
-	namespace string
+	namespace   string
 	resoureName string
-	volumeName string
-	kubeclient *kubernetes.Clientset
-	pod          *corev1.Pod
+	volumeName  string
+	kubeclient  *kubernetes.Clientset
+	pod         *corev1.Pod
 }
 
 func NewPodServer(namespace, resourceName, volumeName string, kubeclient *kubernetes.Clientset) *podServer {
 	return &podServer{
-		namespace: namespace,
+		namespace:   namespace,
 		resoureName: resourceName,
-		volumeName: volumeName,
-		kubeclient: kubeclient,
+		volumeName:  volumeName,
+		kubeclient:  kubeclient,
 	}
 }
 

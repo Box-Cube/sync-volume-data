@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/martian/log"
+	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,18 +34,20 @@ type statefulesetServer struct {
 	resourceName string
 	volumeName   string
 	volumeIndex  int
+	log          *logrus.Entry
 	kubeclient   *kubernetes.Clientset
 	sts          *appsv1.StatefulSet
 	pod          *corev1.Pod
 }
 
-func NewStatefulesetServer(namespace, resourceName, volumeName string, volumeIndex int, kubeclient *kubernetes.Clientset) *statefulesetServer {
+func NewStatefulesetServer(namespace, resourceName, volumeName string, volumeIndex int, kubeclient *kubernetes.Clientset, log *logrus.Entry) *statefulesetServer {
 	return &statefulesetServer{
-		namespace: namespace,
+		namespace:    namespace,
 		resourceName: resourceName,
-		volumeName: volumeName,
-		volumeIndex: volumeIndex,
-		kubeclient: kubeclient,
+		volumeName:   volumeName,
+		volumeIndex:  volumeIndex,
+		kubeclient:   kubeclient,
+		log:          log,
 	}
 }
 
@@ -61,7 +63,7 @@ func (s *statefulesetServer) getVolumePod() (volume *corev1.Volume, pod *corev1.
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("get pod %s from statefulset %s", pod.Name, sts.Name)
+	s.log.Infof("get pod %s from statefulset %s", pod.Name, sts.Name)
 
 	podPvcName := s.volumeName + "-" + s.resourceName + "-" + strconv.Itoa(s.volumeIndex)
 	for _, v := range pod.Spec.Volumes {
@@ -77,7 +79,7 @@ func (s *statefulesetServer) getVolumePod() (volume *corev1.Volume, pod *corev1.
 
 func (s *statefulesetServer) getPodFromSource() (pod *corev1.Pod, err error) {
 	label := metav1.LabelSelector{
-		MatchLabels:      s.sts.Spec.Template.Labels,
+		MatchLabels: s.sts.Spec.Template.Labels,
 	}
 
 	pods, err := s.kubeclient.CoreV1().Pods(s.namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(label.MatchLabels).String()})
@@ -90,10 +92,10 @@ func (s *statefulesetServer) getPodFromSource() (pod *corev1.Pod, err error) {
 	}
 
 	for _, pod := range pods.Items {
-		for _, own := range  pod.OwnerReferences {
+		for _, own := range pod.OwnerReferences {
 			if *own.Controller && own.Name == s.sts.Name && own.Kind == statefulsetKind &&
-				pod.Status.Phase != corev1.PodFailed &&  pod.Status.Phase != corev1.PodSucceeded &&
-				pod.Name == s.sts.Name + "-" +strconv.Itoa(s.volumeIndex) {
+				pod.Status.Phase == corev1.PodRunning &&
+				pod.Name == s.sts.Name+"-"+strconv.Itoa(s.volumeIndex) {
 				return &pod, nil
 			}
 		}

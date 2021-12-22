@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/martian/log"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -32,47 +32,40 @@ import (
 )
 
 type Server struct {
-	kubeclient   *kubernetes.Clientset
-	sshuser      string
-	sshpwd       string
-	sshPort      string
-	tool         string
-	namespace    string
-	resourceKind string
-	resourceName string
-	volume       string
-	instanceIndex  int
-	sourceDir    *[]string
-	errMsg       []error
+	kubeclient    *kubernetes.Clientset
+	sshuser       string
+	sshpwd        string
+	sshPort       string
+	tool          string
+	namespace     string
+	resourceKind  string
+	resourceName  string
+	volume        string
+	instanceIndex int
+	sourceDir     *[]string
+	errMsg        []error
+	log           *logrus.Entry
 }
 
-func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int) *Server {
+func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int, logger *logrus.Entry) *Server {
 	errMsg := new([]error)
 
 	kubeclient := utils.NewClientset()
 
-	//sourceData := strings.Split(*resource, "/")
-	//if len(sourceData) < 2 {
-	//	log.Errorf(errors.New("resource need to specific, try -h get useage").Error())
-	//	os.Exit(1)
-	//}
-
-	//resourceKind := sourceData[0]
-	//resourceName := sourceData[1]
-
 	return &Server{
-		kubeclient:   kubeclient,
-		tool:         tool,
-		namespace:    namespace,
-		resourceKind: resourceKind,
-		resourceName: resourceName,
-		volume:       volume,
-		instanceIndex:  instanceIndex,
-		sourceDir:    sourceDir,
-		sshuser:      sshuser,
-		sshpwd:       sshpwd,
-		sshPort:      sshPort,
-		errMsg:       *errMsg,
+		kubeclient:    kubeclient,
+		tool:          tool,
+		namespace:     namespace,
+		resourceKind:  resourceKind,
+		resourceName:  resourceName,
+		volume:        volume,
+		instanceIndex: instanceIndex,
+		sourceDir:     sourceDir,
+		sshuser:       sshuser,
+		sshpwd:        sshpwd,
+		sshPort:       sshPort,
+		errMsg:        *errMsg,
+		log:           logger,
 	}
 }
 
@@ -87,15 +80,12 @@ const (
 	deployKind      = "Deployment"
 	statefulsetKind = "StatefulSet"
 	daemonsetKind   = "DaemonSet"
-	replicaSetKind = "ReplicaSet"
-	podKind = "Pod"
+	replicaSetKind  = "ReplicaSet"
+	podKind         = "Pod"
 )
 
 func (s *Server) Run() {
-	log.SetLevel(log.Debug)
-
 	s.validateParameter()
-
 	var pod *corev1.Pod
 	var err error
 	var volume *corev1.Volume
@@ -104,57 +94,54 @@ func (s *Server) Run() {
 	defaultRootDir := "/var/lib/kubelet/pods/"
 
 	if s.resourceKind == deployKind {
-		sourceExec = NewDeployServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
+		sourceExec = NewDeployServer(s.namespace, s.resourceName, s.volume, s.kubeclient, s.log)
 		//volume, pod, err = deployRun.getVolumeInfo()
 	} else if s.resourceKind == daemonsetKind {
-		sourceExec = NewDaemonsetServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
+		sourceExec = NewDaemonsetServer(s.namespace, s.resourceName, s.volume, s.kubeclient, s.log)
 	} else if s.resourceKind == statefulsetKind {
-		sourceExec = NewStatefulesetServer(s.namespace, s.resourceName, s.volume, s.instanceIndex, s.kubeclient)
+		sourceExec = NewStatefulesetServer(s.namespace, s.resourceName, s.volume, s.instanceIndex, s.kubeclient, s.log)
 	} else if s.resourceKind == podKind {
 		sourceExec = NewPodServer(s.namespace, s.resourceName, s.volume, s.kubeclient)
 	}
 
 	volume, pod, err = sourceExec.getVolumePod()
 	if err != nil {
-		log.Errorf("%s", err)
+		s.log.Errorf("%s", err)
 		os.Exit(1)
 	}
 
 	nodeIP, err = s.getNodeIPFromPod(pod)
 	if err != nil {
-		log.Errorf("%s", err)
+		s.log.Errorf("%s", err)
 		os.Exit(1)
 	}
-	log.Infof("get node ip %s from pod %s", nodeIP, pod.Name)
+	s.log.Infof("get node ip %s from pod %s", nodeIP, pod.Name)
 
 	volumeDir, err := s.GetVolumeDirectory(volume)
 	if err != nil {
-		log.Errorf("%s", err)
+		s.log.Errorf("%s", err)
 		os.Exit(1)
 	}
 
 	volumePath := defaultRootDir + string(pod.UID) + "/volumes/*/" + volumeDir
-	log.Infof("get volume path: %s", volumePath)
+	s.log.Infof("get volume path: %s", volumePath)
 
 	//for debug
-	//nodeIP = "180.184.65.175"
-	nodeIP = "180.184.64.139"
+	nodeIP = "180.184.65.175"
+	//nodeIP = "180.184.64.139"
 	sshcli := remote.NewCli(s.sshuser, s.sshpwd, fmt.Sprintf("%s:%s", nodeIP, s.sshPort))
 
 	//get only a row as expected
 	actualVolumePath, err := sshcli.Run(fmt.Sprintf("ls -d %s | awk 'NR=1{printf $NF}'", volumePath))
 	if err != nil {
-		log.Errorf("get err from remote node %s : %s", nodeIP, err.Error())
+		s.log.Errorf("get err from remote node %s : %s", nodeIP, err.Error())
 		os.Exit(22)
 	}
 
-	log.Infof("get volume path from remote node: %s", actualVolumePath)
+	s.log.Infof("get volume path from remote node: %s", actualVolumePath)
 
 	var args []string
 	command := s.tool
-
-	//sourceFile := strings.Join(*s.sourceDir, " ")
-
 
 	if s.tool == "scp" {
 		args = []string{
@@ -180,7 +167,7 @@ func (s *Server) Run() {
 
 		args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
 	}
-	log.Infof("execute command: %s args: %s", command, args)
+	s.log.Infof("execute command: %s args: %s", command, args)
 
 	cmd := exec.Command(command, args...)
 
@@ -188,12 +175,12 @@ func (s *Server) Run() {
 	stdout, err := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
 	if err != nil {
-		log.Errorf(err.Error())
+		s.log.Errorf(err.Error())
 		os.Exit(1)
 	}
 
 	if err = cmd.Start(); err != nil {
-		log.Errorf(err.Error())
+		s.log.Errorf(err.Error())
 		os.Exit(33)
 	}
 	// Get the output from the pipe in real time and print it to the terminal
@@ -210,13 +197,13 @@ func (s *Server) Run() {
 		if ex, ok := err.(*exec.ExitError); ok {
 			res := ex.Sys().(syscall.WaitStatus).ExitStatus() //获取命令执行返回状态，相当于shell: echo $?
 			fmt.Println("#####################################################################################")
-			log.Errorf("sync data failed, exit code is %d, err: %s", res, err)
+			s.log.Errorf("sync data failed, exit code is %d, err: %s", res, err)
 			return
 		}
 	}
 
 	fmt.Println("#####################################################################################")
-	log.Infof("sync data to pod volume succeed !!")
+	s.log.Infof("sync data to pod volume succeed !!")
 }
 
 func (s *Server) validateParameter() {
@@ -231,7 +218,7 @@ func (s *Server) validateParameter() {
 
 	if len(s.errMsg) > 0 {
 		for _, err := range s.errMsg {
-			log.Errorf(err.Error())
+			s.log.Errorf(err.Error())
 		}
 		os.Exit(1)
 	}

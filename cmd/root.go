@@ -13,38 +13,41 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-
-	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/viper"
+	"path"
+	"runtime"
+	"strings"
 )
 
 var (
-	cfgFile string
 	volume *string
 	namespace *string
 	source *[]string
 	sshuser *string
 	sshpwd *string
 	sshPort *string
-	tool string
+)
+
+const (
+	RsyncTool = "rsync"
+	ScpTool = "scp"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "sync-volume-data",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "sync-volume-data transfers local files/directories to a specified resource kind",
+	Long: `sync-volume-data transfers local files/directories to a specified resource kind
+           Rsync and SCP are supported. Ensure that the two commands have been installed on the local host.
+           And make sure that the local machine has kubeconfig to connect to the K8S cluster, 
+           the network of the local machine and the internal IP of the K8S node are communicating.
+`,
 	Version: "alpha v1.0",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
@@ -60,7 +63,6 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -84,29 +86,19 @@ func init() {
 	rootCmd.MarkPersistentFlagRequired("source")
 	rootCmd.MarkPersistentFlagRequired("ssh-password")
 
-
-
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".sync-volume-data" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".sync-volume-data")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
+func newLogger() *logrus.Logger {
+	logger := logrus.New()
+	logger.SetReportCaller(true)
+	logger.SetLevel(logrus.DebugLevel)
+	logger.SetFormatter(&logrus.TextFormatter{DisableColors: true, FullTimestamp: true,
+		TimestampFormat: "2006-01-02 15:04:05",
+		CallerPrettyfier:  func(frame *runtime.Frame) (function string, file string) {
+			fileName := path.Base(frame.File)
+			s := strings.Split(frame.Function, ".")
+			funcName := s[len(s)-1]
+			return fmt.Sprintf("%s()",funcName), fmt.Sprintf("%s:%d", fileName, frame.Line)
+		}})
+	return logger
 }
