@@ -21,8 +21,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"sync-volume-data/utils"
 )
 
 var (
@@ -32,6 +34,7 @@ var (
 	sshuser *string
 	sshpwd *string
 	sshPort *string
+	Kubeconfig *string
 )
 
 const (
@@ -75,6 +78,7 @@ func init() {
 	sshuser = rootCmd.PersistentFlags().StringP("ssh-user", "u", "root", "specific user which can ssh to node")
 	sshpwd = rootCmd.PersistentFlags().StringP("ssh-password", "p", "", "specific password which can ssh to node")
 	sshPort = rootCmd.PersistentFlags().StringP("ssh-port", "P", "22", "specific port which can ssh to node")
+	utils.Kubeconfig = rootCmd.PersistentFlags().StringP("kubeconfig", "k", filepath.Join(utils.HomeDir(), ".kube", "config"),"(optional) absolute path to the kubeconfig file")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

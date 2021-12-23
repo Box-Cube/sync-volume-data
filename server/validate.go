@@ -267,6 +267,10 @@ func (s *Server) ValidateSourceDir() (exist bool, err error) {
 		return false, err
 	}
 
+	if s.action == TransferFrom {
+		return true, nil
+	}
+
 	for _, file := range *s.sourceDir {
 		_, err = os.Stat(file)
 		if err == nil {

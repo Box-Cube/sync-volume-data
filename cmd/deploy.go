@@ -28,11 +28,11 @@ import (
 func newDeployCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "deploy",
-		Short: "transfer data to Deployment kind resource",
-		Long: `transfer data to Deployment kind resource, you need to specific a deploy name.
+		Short: "transfer data from/to Deployment kind resource",
+		Long: `transfer data from/to Deployment kind resource, you need to specific a deploy name.
  For example:
 	
-	sync-volume-data rsync deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
+	sync-volume-data rsync to deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
 `,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -50,15 +50,15 @@ func newDeployCmd() *cobra.Command {
 
 			logger.Info("deploy called")
 
-			if cmd.Parent().Use == RsyncTool {
-				logger.Infof("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
-					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger)
+			if cmd.Parent().Parent().Use == RsyncTool {
+				logger.Infof("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, action:%s\n",
+					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, cmd.Parent().Use)
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
-			} else if cmd.Parent().Use == ScpTool {
-				logger.Infof("execute scp deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
-					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger)
+			} else if cmd.Parent().Parent().Use  == ScpTool {
+				logger.Infof("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, action:%s\n",
+					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, cmd.Parent().Use)
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
 			}
 		},
@@ -66,6 +66,8 @@ func newDeployCmd() *cobra.Command {
 }
 
 func init() {
-	rsyncCmd.AddCommand(newDeployCmd())
-	scpCmd.AddCommand(newDeployCmd())
+	rsyncFromCmd.AddCommand(newDeployCmd())
+	rsyncToCmd.AddCommand(newDeployCmd())
+	scpFromCmd.AddCommand(newDeployCmd())
+	scpToCmd.AddCommand(newDeployCmd())
 }

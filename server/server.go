@@ -26,9 +26,17 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"os"
 	"os/exec"
+	"strings"
 	remote "sync-volume-data/remote_execute"
 	"sync-volume-data/utils"
 	"syscall"
+)
+
+type TransferAction string
+
+const (
+	TransferTo  = "to"
+	TransferFrom  = "from"
 )
 
 type Server struct {
@@ -44,10 +52,11 @@ type Server struct {
 	instanceIndex int
 	sourceDir     *[]string
 	errMsg        []error
+	action 		  string
 	log           *logrus.Entry
 }
 
-func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int, logger *logrus.Entry) *Server {
+func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int, logger *logrus.Entry, action string) *Server {
 	errMsg := new([]error)
 
 	kubeclient := utils.NewClientset()
@@ -66,6 +75,7 @@ func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resource
 		sshPort:       sshPort,
 		errMsg:        *errMsg,
 		log:           logger,
+		action: action,
 	}
 }
 
@@ -106,21 +116,18 @@ func (s *Server) Run() {
 
 	volume, pod, err = sourceExec.getVolumePod()
 	if err != nil {
-		s.log.Errorf("%s", err)
-		os.Exit(1)
+		s.log.Fatal(err)
 	}
 
 	nodeIP, err = s.getNodeIPFromPod(pod)
 	if err != nil {
-		s.log.Errorf("%s", err)
-		os.Exit(1)
+		s.log.Fatal(err)
 	}
 	s.log.Infof("get node ip %s from pod %s", nodeIP, pod.Name)
 
 	volumeDir, err := s.GetVolumeDirectory(volume)
 	if err != nil {
-		s.log.Errorf("%s", err)
-		os.Exit(1)
+		s.log.Fatal(err)
 	}
 
 	volumePath := defaultRootDir + string(pod.UID) + "/volumes/*/" + volumeDir
@@ -134,8 +141,7 @@ func (s *Server) Run() {
 	//get only a row as expected
 	actualVolumePath, err := sshcli.Run(fmt.Sprintf("ls -d %s | awk 'NR=1{printf $NF}'", volumePath))
 	if err != nil {
-		s.log.Errorf("get err from remote node %s : %s", nodeIP, err.Error())
-		os.Exit(22)
+		s.log.Fatal("get err from remote node %s : %s", nodeIP, err.Error())
 	}
 
 	s.log.Infof("get volume path from remote node: %s", actualVolumePath)
@@ -149,39 +155,58 @@ func (s *Server) Run() {
 			"-P",
 			s.sshPort,
 		}
+		if s.action == TransferTo {
+			for _, file := range *s.sourceDir {
+				args = append(args, file)
+			}
 
-		for _, file := range *s.sourceDir {
-			args = append(args, file)
+			args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
+		} else if s.action == TransferFrom {
+			if len(*s.sourceDir) == 1 {
+				args = append(args, fmt.Sprintf(`%s@%s:%s/%s`, s.sshuser, nodeIP, actualVolumePath, strings.Join(*s.sourceDir, "")))
+			} else if len(*s.sourceDir) > 1 {
+				args = append(args, fmt.Sprintf(`%s@%s:%s/{%s}`, s.sshuser, nodeIP, actualVolumePath, strings.Join(*s.sourceDir, ",")))
+
+			}
+			//TODO support destination
+			args = append(args, ".")
 		}
 
-		args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
 	} else if s.tool == "rsync" {
 		args = []string{
 			"-av",
+			"--progress",
 			"-e", fmt.Sprintf("ssh -p %s", s.sshPort),
 		}
+		if s.action == TransferTo {
+			for _, file := range *s.sourceDir {
+				args = append(args, file)
+			}
 
-		for _, file := range *s.sourceDir {
-			args = append(args, file)
+			args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
+		} else if s.action == TransferFrom {
+			if len(*s.sourceDir) == 1 {
+				filePath := actualVolumePath + "/" + strings.Join(*s.sourceDir, "")
+				args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, filePath))
+			} else if len(*s.sourceDir) > 1 {
+				args = append(args, fmt.Sprintf("%s@%s:%s/{%s} ", s.sshuser, nodeIP, actualVolumePath, strings.Join(*s.sourceDir, ",")))
+			}
+			//TODO support destination
+			args = append(args, ".")
 		}
-
-		args = append(args, fmt.Sprintf("%s@%s:%s", s.sshuser, nodeIP, actualVolumePath))
 	}
 	s.log.Infof("execute command: %s args: %s", command, args)
 
 	cmd := exec.Command(command, args...)
-
 	// 命令的错误输出和标准输出都连接到同一个管道
 	stdout, err := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
 	if err != nil {
-		s.log.Errorf(err.Error())
-		os.Exit(1)
+		s.log.Fatal(err.Error())
 	}
 
 	if err = cmd.Start(); err != nil {
-		s.log.Errorf(err.Error())
-		os.Exit(33)
+		s.log.Fatal(err.Error())
 	}
 	// Get the output from the pipe in real time and print it to the terminal
 	for {

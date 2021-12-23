@@ -28,11 +28,11 @@ import (
 func newDsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ds",
-		Short: "transfer data to DaemonSet kind resource",
-		Long: `transfer data to DaemonSet kind resource, you need to specific a daemonset name.
+		Short: "transfer data from/to DaemonSet kind resource",
+		Long: `transfer data from/to DaemonSet kind resource, you need to specific a daemonset name.
  For example:
 	
-	sync-volume-data rsync ds nginx -n my-web -v web -u root -p "myPassword" -s=test.file
+	sync-volume-data rsync from ds nginx -n my-web -v web -u root -p "myPassword" -s=test.file
 `,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -48,14 +48,14 @@ func newDsCmd() *cobra.Command {
 				"name": args[0],
 			})
 			logger.Debug("ds called")
-			if cmd.Parent().Use == RsyncTool {
+			if cmd.Parent().Parent().Use == RsyncTool {
 				fmt.Printf("execute rsync daemonset %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger)
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
-			} else if cmd.Parent().Use == ScpTool {
+			} else if cmd.Parent().Parent().Use == ScpTool {
 				fmt.Printf("execute scp daemonset %s, volume is %s\n", args[0], *volume)
-				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger)
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
 			}
 		},
@@ -63,6 +63,8 @@ func newDsCmd() *cobra.Command {
 }
 
 func init() {
-	rsyncCmd.AddCommand(newDsCmd())
-	scpCmd.AddCommand(newDsCmd())
+	rsyncFromCmd.AddCommand(newDsCmd())
+	rsyncToCmd.AddCommand(newDsCmd())
+	scpFromCmd.AddCommand(newDsCmd())
+	scpToCmd.AddCommand(newDsCmd())
 }
