@@ -33,7 +33,7 @@ func newFromCmd() *cobra.Command {
 
 var (
 	rsyncFromCmd = newFromCmd()
-	scpFromCmd = newFromCmd()
+	scpFromCmd   = newFromCmd()
 )
 
 func init() {

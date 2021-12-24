@@ -29,7 +29,7 @@ var rsyncCmd = &cobra.Command{
 			you can use rsync to trans your local File/Directory
  For example:
 	
-	sync-volume-data rsync deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
+	sync-volume-data rsync to deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
 `,
 }
 

@@ -45,8 +45,8 @@ func newStsCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			logger := newLogger().WithFields(logrus.Fields{
 				"namespace": *namespace,
-				"kind":   cmd.Use,
-				"name": args[0],
+				"kind":      cmd.Use,
+				"name":      args[0],
 			})
 			logger.Debug("sts called")
 			switch cmd.Parent().Parent().Use {
@@ -67,12 +67,16 @@ func newStsCmd() *cobra.Command {
 			if cmd.Parent().Parent().Use == RsyncTool {
 				logger.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, instanceIdex:%d\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, *instanceIndex)
-				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *instanceIndex, logger, cmd.Parent().Use)
+
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "sts",
+					args[0], *volume, source, *instanceIndex, logger, cmd.Parent().Use)
 				s.Run()
 			} else if cmd.Parent().Parent().Use == ScpTool {
 				logger.Printf("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, instanceIdex:%d\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, *instanceIndex)
-				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "sts", args[0], *volume, source, *instanceIndex, logger, cmd.Parent().Use)
+
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "sts",
+					args[0], *volume, source, *instanceIndex, logger, cmd.Parent().Use)
 				s.Run()
 			}
 		},
@@ -81,10 +85,10 @@ func newStsCmd() *cobra.Command {
 
 var (
 	rsyncFromInstanceIndex *int
-	rsyncToInstanceIndex *int
-	scpFromInstanceIndex *int
-	scpToInstanceIndex *int
-	instanceIndex *int
+	rsyncToInstanceIndex   *int
+	scpFromInstanceIndex   *int
+	scpToInstanceIndex     *int
+	instanceIndex          *int
 )
 
 func init() {

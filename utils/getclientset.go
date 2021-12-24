@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"log"
 	"os"
 )
 
@@ -33,14 +34,14 @@ func NewClientset() (clientset *kubernetes.Clientset) {
 	if config, err = rest.InClusterConfig(); err != nil {
 		// 使用 KubeConfig 文件创建集群配置
 		if config, err = clientcmd.BuildConfigFromFlags("", *Kubeconfig); err != nil {
-			panic(err.Error())
+			log.Fatalf("get kubeconfig failed: %s", err.Error())
 		}
 	}
 
 	// 创建 clientset
 	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		log.Fatalf("get clientset failed: %s", err.Error())
 	}
 	return clientset
 }

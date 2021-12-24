@@ -35,8 +35,8 @@ import (
 type TransferAction string
 
 const (
-	TransferTo  = "to"
-	TransferFrom  = "from"
+	TransferTo   = "to"
+	TransferFrom = "from"
 )
 
 type Server struct {
@@ -52,11 +52,12 @@ type Server struct {
 	instanceIndex int
 	sourceDir     *[]string
 	errMsg        []error
-	action 		  string
+	action        string
 	log           *logrus.Entry
 }
 
-func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string, instanceIndex int, logger *logrus.Entry, action string) *Server {
+func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resourceName, volume string, sourceDir *[]string,
+	instanceIndex int, logger *logrus.Entry, action string) *Server {
 	errMsg := new([]error)
 
 	kubeclient := utils.NewClientset()
@@ -75,14 +76,14 @@ func NewServer(tool, sshuser, sshpwd, sshPort, namespace, resourceKind, resource
 		sshPort:       sshPort,
 		errMsg:        *errMsg,
 		log:           logger,
-		action: action,
+		action:        action,
 	}
 }
 
 // 获取 volume directory 全路径
 ///var/lib/kubelet/pods/<podUID>/volumes/<volume-plugin-name>/<volume-dir>
 //<volume-dir> == {PV-NAME} + /mount (CSI 用到就有/mount)
-type sourceInfo interface {
+type resourceInfoer interface {
 	getVolumePod() (volume *corev1.Volume, pod *corev1.Pod, err error)
 }
 
@@ -100,7 +101,7 @@ func (s *Server) Run() {
 	var err error
 	var volume *corev1.Volume
 	var nodeIP string
-	var sourceExec sourceInfo
+	var sourceExec resourceInfoer
 	defaultRootDir := "/var/lib/kubelet/pods/"
 
 	if s.resourceKind == deployKind {
@@ -134,9 +135,10 @@ func (s *Server) Run() {
 	s.log.Infof("get volume path: %s", volumePath)
 
 	//for debug
-	nodeIP = "180.184.65.175"
+	//nodeIP = "180.184.65.175"
 	//nodeIP = "180.184.64.139"
-	sshcli := remote.NewCli(s.sshuser, s.sshpwd, fmt.Sprintf("%s:%s", nodeIP, s.sshPort))
+	//TODO, now only support password method,key method will be supported later
+	sshcli := remote.NewCli(s.sshuser, s.sshpwd, fmt.Sprintf("%s:%s", nodeIP, s.sshPort), remote.SshPassword, "")
 
 	//get only a row as expected
 	actualVolumePath, err := sshcli.Run(fmt.Sprintf("ls -d %s | awk 'NR=1{printf $NF}'", volumePath))

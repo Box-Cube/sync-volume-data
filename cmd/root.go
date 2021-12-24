@@ -28,18 +28,18 @@ import (
 )
 
 var (
-	volume *string
-	namespace *string
-	source *[]string
-	sshuser *string
-	sshpwd *string
-	sshPort *string
+	volume     *string
+	namespace  *string
+	source     *[]string
+	sshuser    *string
+	sshpwd     *string
+	sshPort    *string
 	Kubeconfig *string
 )
 
 const (
 	RsyncTool = "rsync"
-	ScpTool = "scp"
+	ScpTool   = "scp"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -78,7 +78,7 @@ func init() {
 	sshuser = rootCmd.PersistentFlags().StringP("ssh-user", "u", "root", "specific user which can ssh to node")
 	sshpwd = rootCmd.PersistentFlags().StringP("ssh-password", "p", "", "specific password which can ssh to node")
 	sshPort = rootCmd.PersistentFlags().StringP("ssh-port", "P", "22", "specific port which can ssh to node")
-	utils.Kubeconfig = rootCmd.PersistentFlags().StringP("kubeconfig", "k", filepath.Join(utils.HomeDir(), ".kube", "config"),"(optional) absolute path to the kubeconfig file")
+	utils.Kubeconfig = rootCmd.PersistentFlags().StringP("kubeconfig", "k", filepath.Join(utils.HomeDir(), ".kube", "config"), "(optional) path to the kubeconfig file")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -98,11 +98,11 @@ func newLogger() *logrus.Logger {
 	logger.SetLevel(logrus.DebugLevel)
 	logger.SetFormatter(&logrus.TextFormatter{DisableColors: true, FullTimestamp: true,
 		TimestampFormat: "2006-01-02 15:04:05",
-		CallerPrettyfier:  func(frame *runtime.Frame) (function string, file string) {
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
 			fileName := path.Base(frame.File)
 			s := strings.Split(frame.Function, ".")
 			funcName := s[len(s)-1]
-			return fmt.Sprintf("%s()",funcName), fmt.Sprintf("%s:%d", fileName, frame.Line)
+			return fmt.Sprintf("%s()", funcName), fmt.Sprintf("%s:%d", fileName, frame.Line)
 		}})
 	return logger
 }

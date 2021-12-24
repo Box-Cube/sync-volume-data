@@ -90,7 +90,7 @@ func (d *deployServer) getPodFromSource() (pod *corev1.Pod, err error) {
 		return nil, errors.New("pods not found")
 	}
 
-	//既然deploy符合预期状态，那就随机挑选一个pod
+	//Since deploy is working as expected, pick a pod at random
 	for _, pod := range pods.Items {
 		for _, own := range pod.OwnerReferences {
 			deployName := own.Name[0:strings.LastIndex(own.Name, "-")]

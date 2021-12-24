@@ -18,14 +18,25 @@ package remote
 
 import (
 	"errors"
+	//"github.com/mitchellh/go-homedir"
 	gossh "golang.org/x/crypto/ssh"
 	"io/ioutil"
+	"log"
 	"net"
+	"os"
+	"path"
+)
+
+const (
+	SshPassword = "password"
+	SshKey      = "key"
 )
 
 type Cli struct {
 	user       string
-	pwd        string
+	pwd        gossh.AuthMethod
+	publicKey  gossh.AuthMethod
+	sshType    string
 	addr       string
 	client     *gossh.Client
 	session    *gossh.Session
@@ -36,7 +47,12 @@ func (c *Cli) Connect() (*Cli, error) {
 	config := &gossh.ClientConfig{}
 	config.SetDefaults()
 	config.User = c.user
-	config.Auth = []gossh.AuthMethod{gossh.Password(c.pwd)}
+	if c.sshType == SshKey {
+		config.Auth = []gossh.AuthMethod{c.publicKey}
+	} else if c.sshType == SshPassword {
+		config.Auth = []gossh.AuthMethod{c.pwd}
+	}
+
 	config.HostKeyCallback = func(hostname string, remote net.Addr, key gossh.PublicKey) error { return nil }
 	client, err := gossh.Dial("tcp", c.addr, config)
 	if nil != err {
@@ -82,10 +98,49 @@ func (c *Cli) Run(shell string) (string, error) {
 	return string(stdoutMsg), nil
 }
 
-func NewCli(user, pwd, addr string) *Cli {
-	return &Cli{
-		user: user,
-		pwd:  pwd,
-		addr: addr,
+func NewCli(user, pwd, addr, sshType, publicKey string) *Cli {
+	if sshType == SshPassword {
+		return &Cli{
+			user: user,
+			pwd:  gossh.Password(pwd),
+			addr: addr,
+			sshType: SshPassword,
+		}
+	} else if sshType == SshKey {
+		return &Cli{
+			user: user,
+			addr: addr,
+			sshType: SshKey,
+			publicKey: publicKeyAuthFunc(publicKey),
+		}
+	} else {
+		return nil
 	}
+}
+
+func publicKeyAuthFunc(kPath string) gossh.AuthMethod {
+	var keyPath string
+	if kPath == "" {
+		homePath, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		//keyPath, err := ioutil.ReadFile(path.Join(homePath, ".ssh", "id_rsa"))
+		//if err != nil {
+		//	return nil
+		//}
+		keyPath = path.Join(homePath, ".ssh", "id_rsa")
+	}
+
+	log.Printf("kyePath: %s", keyPath)
+	key, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		log.Fatal("ssh key file read failed", err)
+	}
+	// Create the Signer for this private key.
+	signer, err := gossh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatal("ssh key signer failed", err)
+	}
+	return gossh.PublicKeys(signer)
 }

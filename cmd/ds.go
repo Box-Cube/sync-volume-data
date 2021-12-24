@@ -44,18 +44,22 @@ func newDsCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			logger := newLogger().WithFields(logrus.Fields{
 				"namespace": *namespace,
-				"kind":   cmd.Use,
-				"name": args[0],
+				"kind":      cmd.Use,
+				"name":      args[0],
 			})
 			logger.Debug("ds called")
 			if cmd.Parent().Parent().Use == RsyncTool {
 				fmt.Printf("execute rsync daemonset %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort)
-				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger, cmd.Parent().Use)
+
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds",
+					args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
 			} else if cmd.Parent().Parent().Use == ScpTool {
 				fmt.Printf("execute scp daemonset %s, volume is %s\n", args[0], *volume)
-				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds", args[0], *volume, source, -1, logger, cmd.Parent().Use)
+
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "ds",
+					args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
 			}
 		},

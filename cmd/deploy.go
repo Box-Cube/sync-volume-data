@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
@@ -44,8 +45,8 @@ func newDeployCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			logger := newLogger().WithFields(logrus.Fields{
 				"namespace": *namespace,
-				"kind":   cmd.Use,
-				"name": args[0],
+				"kind":      cmd.Use,
+				"name":      args[0],
 			})
 
 			logger.Info("deploy called")
@@ -53,12 +54,16 @@ func newDeployCmd() *cobra.Command {
 			if cmd.Parent().Parent().Use == RsyncTool {
 				logger.Infof("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, action:%s\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, cmd.Parent().Use)
-				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger, cmd.Parent().Use)
+
+				s := server.NewServer(RsyncTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy",
+					args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
-			} else if cmd.Parent().Parent().Use  == ScpTool {
+			} else if cmd.Parent().Parent().Use == ScpTool {
 				logger.Infof("execute rsync deploy %s, volume is %s, namespace is %s, rousce is %v, sshuser: %s, sshpwd:%s, sshport:%s, action:%s\n",
 					args[0], *volume, *namespace, *source, *sshuser, *sshpwd, *sshPort, cmd.Parent().Use)
-				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy", args[0], *volume, source, -1, logger, cmd.Parent().Use)
+
+				s := server.NewServer(ScpTool, *sshuser, *sshpwd, *sshPort, *namespace, "deploy",
+					args[0], *volume, source, -1, logger, cmd.Parent().Use)
 				s.Run()
 			}
 		},

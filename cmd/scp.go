@@ -29,7 +29,7 @@ var scpCmd = &cobra.Command{
 			you can use scp to trans your local File/Directory
  For example:
 	
-	sync-volume-data scp deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
+	sync-volume-data scp to deploy nginx -n my-web -v web -u root -p "myPassword" -s=test.file
 `,
 }
 
