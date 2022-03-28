@@ -154,7 +154,6 @@ func (s *Server) ValidateSourceName() error {
 
 		return nil
 	} else {
-		//TODO support statefulset and daemonset
 		err := errors.New(fmt.Sprintf("sourceKind %s not supported, pleas try \"-h\" to get useage", s.resourceKind))
 		s.errMsg = append(s.errMsg, err)
 		return err
